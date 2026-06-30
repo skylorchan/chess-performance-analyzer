@@ -1,0 +1,1 @@
+"""Chess performance analyzer package."""
