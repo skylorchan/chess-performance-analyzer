@@ -13,7 +13,7 @@ import hashlib
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -37,11 +37,13 @@ _SESSION.headers.update({"User-Agent": "chess-performance-analyzer/1.0 (personal
 # ---------------------------------------------------------------------------
 
 def _cache_key(url: str) -> Path:
+    """Map a request URL to its cache file path (MD5 of the URL)."""
     digest = hashlib.md5(url.encode()).hexdigest()
     return CACHE_DIR / f"{digest}.json"
 
 
 def _load_cache(url: str):
+    """Return the cached JSON for a URL, or None if it isn't cached."""
     path = _cache_key(url)
     if path.exists():
         return json.loads(path.read_text(encoding="utf-8"))
@@ -49,12 +51,14 @@ def _load_cache(url: str):
 
 
 def _save_cache(url: str, data) -> None:
+    """Write a response payload to the cache, creating the dir if needed."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     _cache_key(url).write_text(json.dumps(data), encoding="utf-8")
 
 
 def _is_current_month(year: int, month: int) -> bool:
-    now = datetime.utcnow()
+    """True if (year, month) is the current UTC month (never cache it)."""
+    now = datetime.now(timezone.utc)
     return year == now.year and month == now.month
 
 

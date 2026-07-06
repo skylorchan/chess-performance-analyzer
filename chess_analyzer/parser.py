@@ -124,6 +124,7 @@ def _opening_from_eco_url(eco_url: str) -> str:
 
 
 def _infer_platform(site: str) -> str:
+    """Classify a game as 'chesscom', 'lichess', or 'unknown' from [Site]."""
     s = site.lower()
     if "chess.com" in s or s == "chess.com":
         return "chesscom"
