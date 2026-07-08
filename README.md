@@ -5,6 +5,11 @@ A personal analytics tool for competitive chess players. It pulls your game hist
 The guiding principle throughout is **honest statistics**. Chess game samples are small, and raw win rates are misleading without accounting for opponent strength. Every metric here is reported with its sample size, and results computed from too few games are flagged rather than hidden.
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+![Tests](https://img.shields.io/badge/tests-47%20passing-brightgreen.svg)
+
+**[▶ Try it live](https://chess-performance-analyzer.streamlit.app)** — no install, no account needed. Click "See a live demo" to explore a real player's data.
+
+![Dashboard screenshot](docs/screenshot.png)
 
 ## What it does
 

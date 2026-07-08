@@ -302,7 +302,101 @@ def rating_trajectory(df: pd.DataFrame, rolling_window: int = 20) -> pd.DataFram
 
 
 # ---------------------------------------------------------------------------
-# 5. Summary stats — single dict for the dashboard header
+# 5. Key findings — auto-generated headline insights
+# ---------------------------------------------------------------------------
+
+def key_findings(df: pd.DataFrame, max_findings: int = 4) -> list[str]:
+    """Return the most notable insights as short plain-English sentences.
+
+    This is deliberately conservative: a finding is only emitted when it
+    comes from a reliable sample (n >= MIN_SAMPLE) and the effect is large
+    enough to matter (score edge beyond +/-0.05, i.e. more than a
+    twentieth of a point per game).  Fewer honest findings beat a longer
+    list of noise.
+
+    Candidates considered, in priority order:
+      1. Game-length trend (short-game vs long-game edge gap)
+      2. Worst opening by score edge
+      3. Best opening by score edge
+      4. Weakest time control
+      5. Rating trend over the last ~50 games
+    """
+    findings: list[str] = []
+    _EDGE = 0.05  # minimum |score_edge| worth reporting
+
+    # 1. Game-length trend: compare shortest and longest reliable buckets.
+    ml = performance_by_move_count(df)
+    rel = ml[ml["reliable"]]
+    if len(rel) >= 2:
+        first, last = rel.iloc[0], rel.iloc[-1]
+        gap = last["score_edge"] - first["score_edge"]
+        if gap > 2 * _EDGE:
+            findings.append(
+                f"You get stronger as games go longer: score edge climbs from "
+                f"{first['score_edge']:+.2f} in games of {first['move_bucket']} "
+                f"to {last['score_edge']:+.2f} at {last['move_bucket']} moves "
+                f"({int(first['n_games'])} and {int(last['n_games'])} games). "
+                f"Short losses are the leak."
+            )
+        elif gap < -2 * _EDGE:
+            findings.append(
+                f"You start strong but fade: score edge falls from "
+                f"{first['score_edge']:+.2f} in short games to "
+                f"{last['score_edge']:+.2f} in long ones "
+                f"({int(first['n_games'])} and {int(last['n_games'])} games)."
+            )
+
+    # 2 & 3. Opening extremes (reliable samples only; table is sorted worst-first).
+    op = opening_performance(df)
+    op_rel = op[op["reliable"]]
+    if len(op_rel) > 0:
+        worst = op_rel.iloc[0]
+        if worst["score_edge"] < -_EDGE:
+            findings.append(
+                f"Your costliest opening is the {worst['opening']} ({worst['eco']}): "
+                f"{worst['score_edge']:+.2f} score edge over {int(worst['n_games'])} games: "
+                f"you score {worst['avg_score']:.0%} where your rating predicts "
+                f"{worst['avg_expected']:.0%}."
+            )
+        best = op_rel.iloc[-1]
+        if best["score_edge"] > _EDGE and best.name != worst.name:
+            findings.append(
+                f"Your best weapon is the {best['opening']} ({best['eco']}): "
+                f"{best['score_edge']:+.2f} edge over {int(best['n_games'])} games."
+            )
+
+    # 4. Weakest time control (only if it's meaningfully below the others).
+    tc = performance_by_time_control(df)
+    tc_rel = tc[tc["reliable"]]
+    if len(tc_rel) >= 2:
+        worst_tc = tc_rel.loc[tc_rel["score_edge"].idxmin()]
+        rest = tc_rel[tc_rel["time_category"] != worst_tc["time_category"]]
+        if worst_tc["score_edge"] < rest["score_edge"].mean() - _EDGE:
+            findings.append(
+                f"{worst_tc['time_category'].capitalize()} is your weakest format: "
+                f"{worst_tc['score_edge']:+.2f} edge across {int(worst_tc['n_games'])} games, "
+                f"clearly below your other time controls."
+            )
+
+    # 5. Recent rating trend (last 50 games vs the 50 before).
+    traj = rating_trajectory(df)
+    if len(traj) >= 100:
+        recent = traj["my_rating"].iloc[-50:].mean()
+        before = traj["my_rating"].iloc[-100:-50].mean()
+        delta = recent - before
+        if abs(delta) >= 25:
+            direction = "up" if delta > 0 else "down"
+            findings.append(
+                f"Your last 50 games average {abs(delta):.0f} points "
+                f"{direction} on the 50 before them "
+                f"({before:.0f} -> {recent:.0f})."
+            )
+
+    return findings[:max_findings]
+
+
+# ---------------------------------------------------------------------------
+# 6. Summary stats — single dict for the dashboard header
 # ---------------------------------------------------------------------------
 
 def summary_stats(df: pd.DataFrame) -> dict:

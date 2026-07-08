@@ -20,8 +20,13 @@ from chess_analyzer.analysis import (
     performance_by_move_count,
     performance_by_rating_bucket,
     rating_trajectory,
+    key_findings,
     MIN_SAMPLE,
 )
+
+# Public account used by the "demo" button so a first-time visitor sees the
+# full dashboard without needing a Chess.com account of their own.
+DEMO_USERNAME = "lifeofjaselol"
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -62,8 +67,22 @@ def get_data(username: str, platform: str) -> pd.DataFrame:
     return load_games(username, platform=platform)
 
 
+if st.session_state.pop("demo_requested", False):
+    username = DEMO_USERNAME
+    run = True
+
 if not run and "df" not in st.session_state:
-    st.info("Enter your username in the sidebar and click **Analyze**.")
+    # Empty state: give visitors without a Chess.com account a one-click path.
+    st.title("♟ Chess Performance Analyzer")
+    st.markdown(
+        "Pulls your Chess.com game history and shows which openings cost you "
+        "rating, whether you fade in long games, and how you really perform "
+        "against stronger opponents — with the statistics done honestly."
+    )
+    st.info("Enter your username in the sidebar and click **Analyze** — or:")
+    if st.button("See a live demo", type="primary"):
+        st.session_state["demo_requested"] = True
+        st.rerun()
     st.stop()
 
 if run:
@@ -121,6 +140,21 @@ c4.metric("Current rating", stats["current_rating"])
 c5.metric("Avg game length", f"{stats['avg_game_length']} moves")
 
 st.divider()
+
+# ---------------------------------------------------------------------------
+# Key findings — the headline insights, computed in analysis.py
+# ---------------------------------------------------------------------------
+
+findings = key_findings(df)
+if findings:
+    st.subheader("Key findings")
+    for f in findings:
+        st.markdown(f"- {f}")
+    st.caption(
+        "Only patterns from reliable samples (10+ games) with a meaningful "
+        "effect size are shown here. Details in the tabs below."
+    )
+    st.divider()
 
 # ---------------------------------------------------------------------------
 # Tab layout

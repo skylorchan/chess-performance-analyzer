@@ -11,6 +11,7 @@ from chess_analyzer.analysis import (
     performance_by_move_count,
     rating_trajectory,
     summary_stats,
+    key_findings,
     MIN_SAMPLE,
 )
 
@@ -174,6 +175,47 @@ class TestRatingTrajectory:
         result = rating_trajectory(df)
         for col in ["date", "my_rating", "rolling_avg", "time_category"]:
             assert col in result.columns
+
+
+# ---------------------------------------------------------------------------
+# key_findings
+# ---------------------------------------------------------------------------
+
+class TestKeyFindings:
+    def test_returns_list_of_strings(self):
+        # Enough games in one bad opening to trigger the opening finding.
+        rows = [{"opening": "Bad Opening", "eco": "Z99", "result": "loss",
+                 "my_rating": 1500, "opp_rating": 1500}] * 15
+        findings = key_findings(make_df(rows))
+        assert isinstance(findings, list)
+        assert all(isinstance(f, str) for f in findings)
+
+    def test_bad_opening_reported(self):
+        rows = [{"opening": "Bad Opening", "eco": "Z99", "result": "loss",
+                 "my_rating": 1500, "opp_rating": 1500}] * 15
+        findings = key_findings(make_df(rows))
+        assert any("Bad Opening" in f for f in findings)
+
+    def test_silent_on_thin_data(self):
+        # 3 games: everything below MIN_SAMPLE → no findings, not noise.
+        rows = [{"result": "loss"}] * 3
+        assert key_findings(make_df(rows)) == []
+
+    def test_respects_max_findings(self):
+        rows = [{"opening": "Bad Opening", "eco": "Z99", "result": "loss",
+                 "my_rating": 1500, "opp_rating": 1500}] * 15
+        assert len(key_findings(make_df(rows), max_findings=1)) <= 1
+
+    def test_no_finding_when_performance_matches_elo(self):
+        # Wins against much weaker + losses against much stronger ≈ Elo-expected.
+        # Use one opening so nothing stands out.
+        rows = (
+            [{"result": "win", "my_rating": 1900, "opp_rating": 1300}] * 15
+            + [{"result": "loss", "my_rating": 1300, "opp_rating": 1900}] * 15
+        )
+        findings = key_findings(make_df(rows))
+        # Opening finding must not fire: performance tracks expectation.
+        assert not any("costliest" in f or "best weapon" in f for f in findings)
 
 
 # ---------------------------------------------------------------------------
