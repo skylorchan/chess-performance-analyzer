@@ -9,6 +9,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from pandas.io.formats.style import Styler
 
 from chess_analyzer.parser import load_games
 from chess_analyzer.analysis import (
@@ -38,14 +39,14 @@ st.set_page_config(
 
 with st.sidebar:
     st.title("♟ Chess Analyzer")
-    username = st.text_input("Chess.com username", value="lifeofjaselol")
+    username = st.text_input("Chess.com username", value="", placeholder="e.g. hikaru")
     platform = st.selectbox("Platform", ["chesscom", "lichess", "both"])
     min_games = st.slider(
         "Min games to show an opening",
         min_value=3, max_value=30, value=MIN_SAMPLE,
         help="Openings with fewer games than this are hidden from the opening table.",
     )
-    run = st.button("Analyze", type="primary", use_container_width=True)
+    run = st.button("Analyze", type="primary", width="stretch")
     st.divider()
     st.caption(
         "Data is cached locally after the first fetch. "
@@ -66,9 +67,12 @@ if not run and "df" not in st.session_state:
     st.stop()
 
 if run:
+    if not username.strip():
+        st.warning("Please enter a username first.")
+        st.stop()
     try:
-        st.session_state["df"] = get_data(username, platform)
-        st.session_state["username"] = username
+        st.session_state["df"] = get_data(username.strip(), platform)
+        st.session_state["username"] = username.strip()
     except ValueError as e:
         st.error(str(e))
         st.stop()
@@ -84,7 +88,7 @@ if df.empty:
 # Helper: color unreliable rows in tables
 # ---------------------------------------------------------------------------
 
-def style_reliable(df_in: pd.DataFrame) -> pd.io.formats.style.Styler:
+def style_reliable(df_in: pd.DataFrame) -> Styler:
     """Gray out rows where reliable == False."""
     def _row_style(row):
         if "reliable" in row.index and not row["reliable"]:
@@ -162,7 +166,7 @@ with tab_rating:
         margin=dict(l=0, r=0, t=10, b=0),
         height=380,
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 # ── Tab 2: Openings ─────────────────────────────────────────────────────────
 
@@ -205,7 +209,7 @@ with tab_openings:
                 yaxis_title="",
             )
             fig2.add_vline(x=0, line_width=1, line_color="#374151")
-            st.plotly_chart(fig2, use_container_width=True)
+            st.plotly_chart(fig2, width="stretch")
 
     with col_right:
         st.markdown("**Full table** (grayed = < min games)")
@@ -215,7 +219,7 @@ with tab_openings:
         display_op["score_edge"] = display_op["score_edge"].map(fmt_f2)
         st.dataframe(
             style_reliable(display_op),
-            use_container_width=True,
+            width="stretch",
             height=420,
             hide_index=True,
         )
@@ -256,7 +260,7 @@ with tab_length:
         margin=dict(l=0, r=0, t=10, b=0),
         height=360,
     )
-    st.plotly_chart(fig3, use_container_width=True)
+    st.plotly_chart(fig3, width="stretch")
 
     # Score edge line overlaid
     fig4 = px.line(
@@ -268,7 +272,7 @@ with tab_length:
     fig4.add_hline(y=0, line_width=1, line_dash="dash", line_color="#374151")
     fig4.update_traces(line_color="#2563eb", marker_size=8)
     fig4.update_layout(margin=dict(l=0, r=0, t=40, b=0), height=280)
-    st.plotly_chart(fig4, use_container_width=True)
+    st.plotly_chart(fig4, width="stretch")
 
     st.caption(
         "Grayed buckets have fewer than "
@@ -276,7 +280,7 @@ with tab_length:
     )
     st.dataframe(
         style_reliable(ml[["move_bucket", "n_games", "win_rate", "draw_rate", "loss_rate", "score_edge", "reliable"]]),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -308,12 +312,12 @@ with tab_breakdown:
             height=300,
             showlegend=True,
         )
-        st.plotly_chart(fig5, use_container_width=True)
+        st.plotly_chart(fig5, width="stretch")
 
         color_display = color_df[["color", "n_games", "win_rate", "score_edge"]].copy()
         color_display["win_rate"] = color_display["win_rate"].map(fmt_pct)
         color_display["score_edge"] = color_display["score_edge"].map(fmt_f2)
-        st.dataframe(color_display, use_container_width=True, hide_index=True)
+        st.dataframe(color_display, width="stretch", hide_index=True)
 
     with right:
         st.markdown("**By time control**")
@@ -336,12 +340,12 @@ with tab_breakdown:
             margin=dict(l=0, r=0, t=10, b=0),
             height=300,
         )
-        st.plotly_chart(fig6, use_container_width=True)
+        st.plotly_chart(fig6, width="stretch")
 
         tc_display = tc_df[["time_category", "n_games", "win_rate", "score_edge", "reliable"]].copy()
         tc_display["win_rate"] = tc_display["win_rate"].map(fmt_pct)
         tc_display["score_edge"] = tc_display["score_edge"].map(fmt_f2)
-        st.dataframe(style_reliable(tc_display), use_container_width=True, hide_index=True)
+        st.dataframe(style_reliable(tc_display), width="stretch", hide_index=True)
 
     st.divider()
     st.markdown("**By opponent strength (relative to your rating)**")
@@ -373,10 +377,10 @@ with tab_breakdown:
         height=320,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
-    st.plotly_chart(fig7, use_container_width=True)
+    st.plotly_chart(fig7, width="stretch")
 
     rb_display = rb_df[["rating_bucket", "n_games", "win_rate", "avg_expected", "score_edge", "reliable"]].copy()
     rb_display["win_rate"] = rb_display["win_rate"].map(fmt_pct)
     rb_display["avg_expected"] = rb_display["avg_expected"].map(fmt_pct)
     rb_display["score_edge"] = rb_display["score_edge"].map(fmt_f2)
-    st.dataframe(style_reliable(rb_display), use_container_width=True, hide_index=True)
+    st.dataframe(style_reliable(rb_display), width="stretch", hide_index=True)
